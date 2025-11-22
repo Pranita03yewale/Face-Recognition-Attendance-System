@@ -1,0 +1,69 @@
+
+        # Database connection
+        self.conn = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="",
+            database="face recognition attendance system"
+        )
+        self.c = self.conn.cursor()
+
+        def create_users_table(self):
+            # Define the SQL query to create the table
+            create_table_query = """
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                first_name VARCHAR(255),
+                last_name VARCHAR(255),
+                contact_no VARCHAR(20),
+                email VARCHAR(255),
+                security_question VARCHAR(255),
+                security_answer VARCHAR(255),
+                password VARCHAR(255)
+            )
+            """
+
+            # Execute the SQL query to create the table
+            self.c.execute(create_table_query)
+
+            # Commit the transaction
+            self.conn.commit()
+
+    def register(self):
+        def register(self):
+            # Get user input
+            first_name = self.fname_entry.get()
+            last_name = self.txt_l_name.get()
+            contact_no = self.txt_contact.get()
+            email = self.txt_email.get()
+            security_question = self.combo_security_Q.get()
+            security_answer = self.txt_security.get()
+            password = self.txt_pswd.get()
+            confirm_password = self.txr_confirm_pswd.get()
+
+
+            # Check if passwords match
+            if password != confirm_password:
+                messagebox.showerror("Error", "Passwords do not match")
+                return
+
+            try:
+                 # Insert into database
+                sql = "INSERT INTO users (first_name, last_name, contact_no, email, security_question, security_answer, password) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+                values = (first_name, last_name, contact_no, email, security_question, security_answer, password)
+                self.c.execute(sql, values)
+                self.conn.commit()
+                messagebox.showinfo("Success", "Registration successful!")
+            except mysql.connector.Error as e:
+                messagebox.showerror("Error", f"Error registering user: {e}")
+                logging.error("Error registering user:", exc_info=True)  # Log the error for debugging
+
+    def login(self):
+        # Add your login logic here
+        pass
+
+    def __del__(self):
+        # Close the database connection when the object is destroyed
+        self.conn.close()
+
+         messagebox.showinfo("Success","Welcome Back")

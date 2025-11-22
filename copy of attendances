@@ -1,0 +1,234 @@
+import cv2
+import numpy as np
+import mysql.connector
+from datetime import datetime
+from tkinter import *
+from tkinter import ttk
+from PIL import Image, ImageTk
+from tkinter import messagebox
+import pandas as pd
+from tkcalendar import DateEntry
+import threading
+
+class FaceRecognitionAttendance:
+    def __init__(self, root):
+        self.root = root
+        self.root.geometry("1530x790+0+0")
+        self.root.title("Face Recognition Attendance System")
+
+        # Load known faces and encodings
+        self.known_face_encodings = []
+        self.known_face_names = []
+
+        self.load_known_faces()
+
+        # Background image
+        img3 = Image.open(r"images/login.jpeg")
+        img3 = img3.resize((1530, 710), Image.LANCZOS)
+        self.photoimg3 = ImageTk.PhotoImage(img3)
+
+        bg_img = Label(self.root, image=self.photoimg3)
+        bg_img.place(x=0, y=0, width=1530, height=710)
+
+        title_lbl = Label(bg_img, text="ATTENDANCE MANAGEMENT SYSTEM", font=("times new roman", 35, "bold"), bg="white", fg="red")
+        title_lbl.place(x=0, y=0, width=1530, height=45)
+
+        main_frame = Frame(bg_img, bd=2)
+        main_frame.place(x=10, y=55, width=1500, height=600)
+
+        # Right label frame
+        Right_frame = LabelFrame(main_frame, bd=2, bg="white", relief=RIDGE, text="Attendance Details", font=("times new roman", 12, "bold"))
+        Right_frame.place(x=750, y=10, width=730, height=580)
+
+        table_frame = Frame(Right_frame, bd=2, bg="white", relief=RIDGE)
+        table_frame.place(x=5, y=5, width=710, height=455)
+
+        scroll_x = ttk.Scrollbar(table_frame, orient=HORIZONTAL)
+        scroll_y = ttk.Scrollbar(table_frame, orient=VERTICAL)
+
+        self.attendance_table = ttk.Treeview(table_frame, column=("id", "roll", "name", "department", "time", "date", "attendance"), xscrollcommand=scroll_x.set, yscrollcommand=scroll_y.set)
+
+        scroll_x.pack(side=BOTTOM, fill=X)
+        scroll_y.pack(side=RIGHT, fill=Y)
+        scroll_x.config(command=self.attendance_table.xview)
+        scroll_y.config(command=self.attendance_table.yview)
+
+        self.attendance_table.heading("id", text="Attendance ID")
+        self.attendance_table.heading("roll", text="Roll")
+        self.attendance_table.heading("name", text="Name")
+        self.attendance_table.heading("department", text="Department")
+        self.attendance_table.heading("time", text="Time")
+        self.attendance_table.heading("date", text="Date")
+        self.attendance_table.heading("attendance", text="Attendance Status")
+
+        self.attendance_table["show"] = "headings"
+
+        self.attendance_table.column("id", width=100)
+        self.attendance_table.column("roll", width=100)
+        self.attendance_table.column("name", width=100)
+        self.attendance_table.column("department", width=100)
+        self.attendance_table.column("time", width=100)
+        self.attendance_table.column("date", width=100)
+        self.attendance_table.column("attendance", width=100)
+
+        self.attendance_table.pack(fill=BOTH, expand=1)
+
+        # Start Attendance Button
+        start_attendance_btn = Button(main_frame, text="Start Attendance", command=self.start_attendance, font=("times new roman", 15, "bold"), bg="blue", fg="white")
+        start_attendance_btn.place(x=10, y=20)
+        
+        # Export Attendance Button
+        export_attendance_btn = Button(main_frame, text="Export to Excel", command=self.export_to_excel, font=("times new roman", 15, "bold"), bg="green", fg="white")
+        export_attendance_btn.place(x=250, y=20)
+
+        export_range_btn = Button(main_frame, text="Export by Date Range", command=self.select_date_range, font=("times new roman", 15, "bold"), bg="green", fg="white")
+        export_range_btn.place(x=450, y=20)
+
+    def load_known_faces(self):
+        # Load known faces from the database or pre-trained data
+        # Placeholder method for loading known face encodings and names
+        pass
+
+    def is_student_enrolled(self, roll):
+        # Implement logic to check if the student is currently enrolled
+        conn = mysql.connector.connect(host="localhost", user="root", password="root@123", database="face_recognition_attendance_system")
+        my_cursor = conn.cursor()
+        query = "SELECT * FROM student WHERE Roll=%s"
+        my_cursor.execute(query, (roll,))
+        row = my_cursor.fetchone()
+        conn.close()
+        return row is not None
+
+    def should_be_present(self, roll, date, time):
+        # Implement logic to check if the student should be present
+        # This could be based on class schedules, timetables, or other relevant information
+        # For simplicity, let's assume students should be present during school hours (8 AM - 5 PM)
+        class_start_time = datetime.strptime("08:00:00", "%H:%M:%S").time()
+        class_end_time = datetime.strptime("17:00:00", "%H:%M:%S").time()
+        current_time = datetime.strptime(time, "%H:%M:%S").time()
+        return class_start_time <= current_time <= class_end_time
+
+    def mark_attendance(self, roll):
+        conn = mysql.connector.connect(host="localhost", user="root", password="root@123", database="face_recognition_attendance_system")
+        my_cursor = conn.cursor()
+        now = datetime.now()
+        d1 = now.strftime("%Y-%m-%d")
+        dtString = now.strftime("%H:%M:%S")
+
+        query = "SELECT * FROM attendance WHERE roll=%s AND date=%s"
+        my_cursor.execute(query, (roll, d1))
+        row = my_cursor.fetchone()
+        if row is None:
+            query = "SELECT Student_name, Department FROM student WHERE Roll=%s"
+            my_cursor.execute(query, (roll,))
+            result = my_cursor.fetchone()
+            if result:
+                name, department = result
+                # Additional checks for attendance marking
+                if self.is_student_enrolled(roll) and self.should_be_present(roll, d1, dtString):
+                    query = "INSERT INTO attendance (roll, name, department, time, date, attendance) VALUES (%s, %s, %s, %s, %s, %s)"
+                    my_cursor.execute(query, (roll, name, department, dtString, d1, "Present"))
+                    conn.commit()
+        conn.close()
+
+    def start_attendance(self):
+        faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        clf = cv2.face.LBPHFaceRecognizer_create()
+        try:
+            clf.read("classifier.xml")  # Load the pre-trained face recognizer
+        except Exception as e:
+            print(f"Error reading classifier.xml: {e}")
+            return
+
+        video_cap = cv2.VideoCapture(0)
+
+        self.attendance_thread = threading.Thread(target=self.attendance_loop, args=(video_cap, clf, faceCascade))
+        self.attendance_thread.start()
+
+    def attendance_loop(self, video_cap, clf, faceCascade):
+        while True:
+            ret, frame = video_cap.read()
+            if not ret:
+                break
+
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = faceCascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+            for (x, y, w, h) in faces:
+                roi_gray = gray[y:y+h, x:x+w]
+                roll, confidence = clf.predict(roi_gray)
+
+                if confidence < 100:
+                    confidence = round(100 - confidence)
+                    conn = mysql.connector.connect(host="localhost", user="root", password="root@123", database="face_recognition_attendance_system")
+                    my_cursor = conn.cursor()
+                    query = "SELECT Student_name FROM student WHERE Roll=%s"
+                    my_cursor.execute(query, (roll,))
+                    result = my_cursor.fetchone()
+                    conn.close()
+
+                    if result:
+                        name = result[0]
+                        display_text = f"{name} ({confidence}%)"
+                    else:
+                        display_text = f"Unknown ({confidence}%)"
+                    self.mark_attendance(roll)
+                else:
+                    display_text = "Unknown"
+
+                # Draw rectangle around the face
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                # Display the resulting frame
+                cv2.putText(frame, display_text, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2, cv2.LINE_AA)
+
+            cv2.imshow('Attendance', frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        video_cap.release()
+        cv2.destroyAllWindows()
+
+    def export_to_excel(self):
+        conn = mysql.connector.connect(host="localhost", user="root", password="root@123", database="face_recognition_attendance_system")
+        query = "SELECT * FROM attendance"
+        df = pd.read_sql(query, conn)
+        conn.close()
+        
+        file_path = 'attendance.xlsx'
+        df.to_excel(file_path, index=False)
+        messagebox.showinfo("Export Successful", f"Attendance data has been exported to {file_path}")
+
+    def select_date_range(self):
+        self.date_window = Toplevel(self.root)
+        self.date_window.title("Select Date Range")
+        self.date_window.geometry("400x300")
+
+        Label(self.date_window, text="Start Date:", font=("times new roman", 15)).pack(pady=10)
+        self.start_date = DateEntry(self.date_window, width=20, background='darkblue', foreground='white', borderwidth=2)
+        self.start_date.pack(pady=10)
+
+        Label(self.date_window, text="End Date:", font=("times new roman", 15)).pack(pady=10)
+        self.end_date = DateEntry(self.date_window, width=20, background='darkblue', foreground='white', borderwidth=2)
+        self.end_date.pack(pady=10)
+
+        Button(self.date_window, text="Export", command=self.export_by_date_range, font=("times new roman", 15, "bold"), bg="green", fg="white").pack(pady=20)
+
+    def export_by_date_range(self):
+        start_date = self.start_date.get_date().strftime("%Y-%m-%d")
+        end_date = self.end_date.get_date().strftime("%Y-%m-%d")
+        
+        conn = mysql.connector.connect(host="localhost", user="root", password="root@123", database="face_recognition_attendance_system")
+        query = "SELECT * FROM attendance WHERE date BETWEEN %s AND %s"
+        df = pd.read_sql(query, conn, params=(start_date, end_date))
+        conn.close()
+        
+        file_path = f'attendance_{start_date}_to_{end_date}.xlsx'
+        df.to_excel(file_path, index=False)
+        messagebox.showinfo("Export Successful", f"Attendance data from {start_date} to {end_date} has been exported to {file_path}")
+        self.date_window.destroy()
+
+if __name__ == "__main__":
+    root = Tk()
+    obj = FaceRecognitionAttendance(root)
+    root.mainloop()
