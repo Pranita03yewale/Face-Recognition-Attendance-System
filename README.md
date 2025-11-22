@@ -30,5 +30,6 @@ Attendance is stored automatically
 
 
 
-<img width="1920" height="1080" alt="Screenshot 2024-05-28 172510" src="https://github.com/user-attachments/assets/19c66635-5a2d-4e17-bf3c-5ebdc6ec297f" />
+<img width="1920" height="1080" alt="Screenshot 2024-05-22 110452" src="https://github.com/user-attachments/assets/370d61b1-9740-4b20-8690-e2536b43cc12" />
+
 
